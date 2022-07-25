@@ -1,2 +1,2 @@
-# rail_anomaly_detection
+# Rail anomaly detection
 Anomaly detection for railroad images.
