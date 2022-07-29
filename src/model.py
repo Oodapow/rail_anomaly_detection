@@ -1,9 +1,11 @@
-from matplotlib.pyplot import axis
 import torch
 import torchvision
 
+from torch import Tensor
+from typing import List
+
 class UNet(torch.nn.Module):
-    def __init__(self, downsample_count=4, channels=64, classes=19):
+    def __init__(self, downsample_count=1, channels=8, classes=19):
         super().__init__()
         assert downsample_count > 0 and downsample_count < 5
 
@@ -19,9 +21,9 @@ class UNet(torch.nn.Module):
             [
                 torch.nn.Sequential(
                     torch.nn.Conv2d(3 if i == 0 else 2 ** (i - 1) * channels, 2 ** i * channels, kernel_size=3, padding=1, bias=False),
-                    torch.nn.ReLU(),
+                    torch.nn.ReLU(inplace=True),
                     torch.nn.Conv2d(2 ** i * channels, 2 ** i * channels, kernel_size=3, padding=1, bias=False),
-                    torch.nn.ReLU(),
+                    torch.nn.ReLU(inplace=True),
                 )
                 for i in range(downsample_count + 1)
             ]
@@ -31,9 +33,9 @@ class UNet(torch.nn.Module):
             [
                 torch.nn.Sequential(
                     torch.nn.Conv2d(2 ** (downsample_count - i - 1) * channels * 2, 2 ** (downsample_count - i - 1) * channels, kernel_size=3, padding=1, bias=False),
-                    torch.nn.ReLU(),
+                    torch.nn.ReLU(inplace=True),
                     torch.nn.Conv2d(2 ** (downsample_count - i - 1) * channels, 2 ** (downsample_count - i - 1) * channels, kernel_size=3, padding=1, bias=False),
-                    torch.nn.ReLU(),
+                    torch.nn.ReLU(inplace=True),
                 )
                 for i in range(downsample_count)
             ]
@@ -54,7 +56,7 @@ class UNet(torch.nn.Module):
     def forward(self, x):
         x = self.transform(x)
 
-        fmaps = []
+        fmaps : List[Tensor] = []
 
         for i in range(self.downsample_count + 1):
             x = self.down_stages[i](x)
@@ -76,8 +78,16 @@ if __name__ == '__main__':
 
     model = UNet()
 
-    in_t = torch.rand((1, 3, 1024, 1024))
+    in_t = torch.rand((1, 3, 1080, 1920))
 
     out_t = model(in_t)
 
     print(out_t.shape)
+
+    torch.onnx.export(
+        model,
+        in_t,
+        'model.onnx',
+        opset_version=11,
+        do_constant_folding=False,
+    )
