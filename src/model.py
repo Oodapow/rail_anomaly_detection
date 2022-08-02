@@ -6,14 +6,11 @@ class ResNet(torch.nn.Module):
         super().__init__()
         self.transform = torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
-        backbone = torchvision.models.resnet18(pretrained=True)
-
-        bn = torchvision.ops.misc.FrozenBatchNorm2d(64)
-        bn.load_state_dict(backbone.bn1.state_dict())
+        backbone = torchvision.models.resnet18(pretrained=True, norm_layer=torchvision.ops.misc.FrozenBatchNorm2d)
 
         self.backbone = torch.nn.Sequential(
             backbone.conv1,
-            bn,
+            backbone.bn1,
             backbone.relu,
             backbone.maxpool,
             backbone.layer1,

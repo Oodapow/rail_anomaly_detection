@@ -1,4 +1,3 @@
-from matplotlib.pyplot import axis
 import torch
 import os
 import numpy as np
@@ -7,20 +6,19 @@ import json
 
 LABELS = ['road', 'sidewalk', 'construction', 'tram-track', 'fence', 'pole', 'traffic-light', 'traffic-sign', 'vegetation', 'terrain', 'sky', 'human', 'rail-track', 'car', 'truck', 'trackbed', 'on-rails', 'rail-raised', 'rail-embedded']
 
-def make_collate_fn(in_dim=(1920, 1080), out_dim=(480, 270)):
-    def collate_fn(batch):
-        images = torch.stack([torch.tensor(cv2.resize(b[0].astype('float32'), in_dim)).permute(2, 0, 1).div(255.) for b in batch])
-        outputs = torch.stack([torch.tensor(cv2.resize(b[1].astype('float32'), out_dim)).permute(2, 0, 1).div(255.) for b in batch])
-        output_images = torch.stack([torch.tensor(cv2.resize(b[0].astype('float32'), out_dim)).permute(2, 0, 1).div(255.) for b in batch])
-
-        return images, outputs, output_images
-    return collate_fn
+def collate_fn(batch):
+    images = torch.stack([b[0] for b in batch])
+    outputs = torch.stack([b[1] for b in batch])
+    output_images = torch.stack([b[2] for b in batch])
+    return images, outputs, output_images
 
 class RailSemDataset(torch.utils.data.Dataset):
-    def __init__(self, path, ids):
+    def __init__(self, path, ids, in_dim=(1920, 1080), out_dim=(480, 270)):
         super().__init__()
         self.path = path
         self.ids = list(ids)
+        self.in_dim = in_dim
+        self.out_dim = out_dim
         with open(os.path.join(path, 'rs19-config.json'), 'r') as f:
             self.config = json.load(f)
 
@@ -29,6 +27,11 @@ class RailSemDataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         id = self.ids[index]
+
+        cache_path = os.path.join(self.path, 'cache', 'rs19_val', f'rs{id:05}_{self.in_dim[0]}x{self.in_dim[1]}_{self.out_dim[0]}x{self.out_dim[1]}.pt')
+
+        if os.path.isfile(cache_path):
+            return torch.load(cache_path)
 
         input_path = os.path.join(self.path, 'jpgs', 'rs19_val', f'rs{id:05}.jpg')
         output_path = os.path.join(self.path, 'uint8', 'rs19_val', f'rs{id:05}.png')
@@ -45,7 +48,15 @@ class RailSemDataset(torch.utils.data.Dataset):
         
         output_tensor = np.concatenate(outputs, axis=2)
 
-        return input_tensor, output_tensor
+        res = (
+            torch.tensor(cv2.resize(input_tensor.astype('float32'), self.in_dim)).permute(2, 0, 1).div(255.), 
+            torch.ceil(torch.tensor(cv2.resize(output_tensor.astype('float32'), self.out_dim)).permute(2, 0, 1).div(255.)),
+            torch.tensor(cv2.resize(input_tensor.astype('float32'), self.out_dim)).permute(2, 0, 1).div(255.)
+        )
+
+        torch.save(res, cache_path)
+
+        return res
         
 if __name__ == '__main__':
 
@@ -53,15 +64,14 @@ if __name__ == '__main__':
 
     print('len:', len(ds))
 
-    it, ot = ds[0]
+    it, ot, iot = ds[0]
 
 
     print('it shape:', it.shape)
     print('ot shape:', ot.shape)
+    print('iotot shape:', iot.shape)
 
-    collate_fn = make_collate_fn()
-
-    it, ot, iot = collate_fn([(it, ot)])
+    it, ot, iot = collate_fn([(it, ot, iot)])
 
     print('collate_fn it shape:', it.shape)
     print('collate_fn ot shape:', ot.shape)

@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 import torch
 from model import ResNet
-from data import RailSemDataset, make_collate_fn, LABELS
+from data import RailSemDataset, collate_fn, LABELS
 
 class SegmentationExperiment(pl.LightningModule):
     def __init__(self, 
@@ -10,6 +10,8 @@ class SegmentationExperiment(pl.LightningModule):
         batch_size, 
         num_workers, 
         decoder_weight,
+        lr_factor,
+        lr_patience,
         decode_classes=['rail-embedded', 'rail-raised', 'rail-track', 'trackbed']
     ):
         super().__init__()
@@ -19,9 +21,11 @@ class SegmentationExperiment(pl.LightningModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.decoder_weight = decoder_weight
+        self.lr_factor = lr_factor
+        self.lr_patience = lr_patience
 
         self.model = ResNet()
-        self.seg_loss = torch.nn.MSELoss()
+        self.seg_loss = torch.nn.BCELoss()
         self.rec_loss = torch.nn.MSELoss()
 
         self.decode_index = [i for i, l in enumerate(LABELS) if l in decode_classes]
@@ -39,7 +43,7 @@ class SegmentationExperiment(pl.LightningModule):
         mask = torch.zeros((B,1,H,W), device=ot.device)
 
         for i in self.decode_index:
-            mask = mask + ot[:,i,:,:]
+            mask = mask + ot[:,i,:,:].unsqueeze(1)
         
         mask = torch.clamp(mask, 0, 1)
 
@@ -55,9 +59,9 @@ class SegmentationExperiment(pl.LightningModule):
         for i,l in enumerate(LABELS):
             inter = torch.count_nonzero(torch.logical_and(ot[:,i,:,:] == 1, e_ot[:,i,:,:] == 1), (1, 2))
             union = torch.count_nonzero(torch.add(ot[:,i,:,:] , e_ot[:,i,:,:] ), (1, 2))
-            iou[l] = inter / (union + 1)
+            iou[l] = (inter / (union + 1)).detach().cpu()
 
-        return {'loss': loss, 'seg_loss': seg_loss, 'rec_loss': rec_loss, 'iou': iou}
+        return {'loss': loss, 'seg_loss': seg_loss.detach().cpu(), 'rec_loss': rec_loss.detach().cpu(), 'iou': iou}
 
     def validation_step(self, batch, batch_idx):
         return self.training_step(batch, batch_idx)
@@ -89,7 +93,23 @@ class SegmentationExperiment(pl.LightningModule):
         self.log_epoch_end(all_outputs, 'eval')
 
     def configure_optimizers(self):
-        return torch.optim.SGD(self.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer, 
+                    factor=self.lr_factor, 
+                    patience=self.lr_patience, 
+                    mode='max'
+                ),
+                'interval': 'epoch',
+                'frequency': 1,
+                'monitor': 'eval_mean_iou',
+                'strict': True,
+                'name': 'learning_rate',
+            },
+        }
 
     ####################
     # DATA RELATED HOOKS
@@ -100,7 +120,7 @@ class SegmentationExperiment(pl.LightningModule):
             RailSemDataset(self.data_dir, range(1000, 8500)), 
             batch_size=self.batch_size, 
             num_workers=self.num_workers,
-            collate_fn=make_collate_fn()
+            collate_fn=collate_fn
         )
 
     def val_dataloader(self):
@@ -108,5 +128,5 @@ class SegmentationExperiment(pl.LightningModule):
             RailSemDataset(self.data_dir, range(0, 1000)), 
             batch_size=1, 
             num_workers=self.num_workers,
-            collate_fn=make_collate_fn()
+            collate_fn=collate_fn
         )
