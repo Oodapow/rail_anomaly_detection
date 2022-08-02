@@ -133,3 +133,6 @@ dmypy.json
 
 # wandb
 */wandb
+
+# lightning
+*/version_*

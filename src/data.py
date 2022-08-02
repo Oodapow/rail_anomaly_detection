@@ -7,16 +7,13 @@ import json
 
 LABELS = ['road', 'sidewalk', 'construction', 'tram-track', 'fence', 'pole', 'traffic-light', 'traffic-sign', 'vegetation', 'terrain', 'sky', 'human', 'rail-track', 'car', 'truck', 'trackbed', 'on-rails', 'rail-raised', 'rail-embedded']
 
-def make_collate_fn(augumenter=lambda x: x):
+def make_collate_fn(in_dim=(1920, 1080), out_dim=(480, 270)):
     def collate_fn(batch):
-        images = torch.stack([torch.tensor(b[0]).permute(2, 0, 1).div(255.) for b in batch])
-        outputs = torch.stack([torch.tensor(b[1]).permute(2, 0, 1).div(255.) for b in batch])
+        images = torch.stack([torch.tensor(cv2.resize(b[0].astype('float32'), in_dim)).permute(2, 0, 1).div(255.) for b in batch])
+        outputs = torch.stack([torch.tensor(cv2.resize(b[1].astype('float32'), out_dim)).permute(2, 0, 1).div(255.) for b in batch])
+        output_images = torch.stack([torch.tensor(cv2.resize(b[0].astype('float32'), out_dim)).permute(2, 0, 1).div(255.) for b in batch])
 
-        tensor = torch.cat([images, outputs], axis=1)
-    
-        tensor = augumenter(tensor)
-
-        return tensor[:, 0:3, :, :], tensor[:, 3:, :, :]
+        return images, outputs, output_images
     return collate_fn
 
 class RailSemDataset(torch.utils.data.Dataset):
@@ -62,17 +59,25 @@ if __name__ == '__main__':
     print('it shape:', it.shape)
     print('ot shape:', ot.shape)
 
-    labels = []
-
-    for i,l in enumerate(ds.config['labels']):
-        labels.append(l['name'])
-        cv2.imwrite(f'{l["name"]}.png', it * ot[:,:,i][:,:,np.newaxis] / 255.)
-
-    print(labels)
-
     collate_fn = make_collate_fn()
 
-    it, ot = collate_fn([(it, ot)])
+    it, ot, iot = collate_fn([(it, ot)])
 
     print('collate_fn it shape:', it.shape)
     print('collate_fn ot shape:', ot.shape)
+    print('collate_fn iot shape:', iot.shape)
+
+    labels = []
+
+
+    # (2, 0, 1)
+    for i,l in enumerate(ds.config['labels']):
+        labels.append(l['name'])
+        cm = ot[:,i,:,:].unsqueeze(0)
+        im = iot * cm * 255.
+        im = im[0]
+        im = im.permute((1, 2, 0)).numpy()
+        print(im.shape)
+        cv2.imwrite(f'{l["name"]}.png', im)
+
+    print(labels)
