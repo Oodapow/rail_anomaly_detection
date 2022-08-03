@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
 import torch
-from model import ResNet
+from model import ResNet, UNet
 from data import RailSemDataset, collate_fn, LABELS
 
 class SegmentationExperiment(pl.LightningModule):
@@ -24,7 +24,7 @@ class SegmentationExperiment(pl.LightningModule):
         self.lr_factor = lr_factor
         self.lr_patience = lr_patience
 
-        self.model = ResNet()
+        self.model = UNet()
         self.seg_loss = torch.nn.BCELoss()
         self.rec_loss = torch.nn.MSELoss()
 

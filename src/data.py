@@ -13,7 +13,7 @@ def collate_fn(batch):
     return images, outputs, output_images
 
 class RailSemDataset(torch.utils.data.Dataset):
-    def __init__(self, path, ids, in_dim=(1920, 1080), out_dim=(480, 270)):
+    def __init__(self, path, ids, in_dim=(960, 540), out_dim=(960, 540)):
         super().__init__()
         self.path = path
         self.ids = list(ids)
