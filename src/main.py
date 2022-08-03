@@ -41,7 +41,7 @@ if __name__ == '__main__':
         progress_bar_refresh_rate=args.progress_bar_refresh_rate,
         logger=logger,
         callbacks=[
-            pl.callbacks.ModelCheckpoint(save_top_k=2, monitor='eval_mean_iou', filename='{epoch}_{eval_mean_iou:.2f}'),
+            pl.callbacks.ModelCheckpoint(save_top_k=2, monitor='eval_mean_iou', filename='{epoch}_{eval_mean_iou:.2f}', mode='max'),
             pl.callbacks.LearningRateMonitor(logging_interval='epoch')
         ],
     )

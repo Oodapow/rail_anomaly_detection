@@ -69,22 +69,25 @@ class SegmentationExperiment(pl.LightningModule):
     def log_epoch_end(self, all_outputs, split):
         seg_loss_sum = 0
         rec_loss_sum = 0
+
         iou_sum = {l:0 for l in LABELS}
+        iou_count = {l:0 for l in LABELS}
         for x in all_outputs:
             seg_loss, rec_loss, iou = x['seg_loss'], x['rec_loss'], x['iou']
             seg_loss_sum += seg_loss
             rec_loss_sum += rec_loss
             for k in LABELS:
-                iou_sum[k] += iou[k]
+                iou_sum[k] += iou[k].sum()
+                iou_count[k] += iou[k].numel()
 
         num_outputs = len(all_outputs)
 
         for l in LABELS:
-            self.log(f'iou/{split}/{l}', iou_sum[l] / num_outputs)
+            self.log(f'iou/{split}/{l}', iou_sum[l] / iou_count[k])
 
         self.log(f'mean/{split}/seg_loss', seg_loss_sum / num_outputs)
         self.log(f'mean/{split}/rec_loss', rec_loss_sum / num_outputs)
-        self.log(f'{split}_mean_iou', sum([v / num_outputs for v in iou_sum.values()]) / len(LABELS))
+        self.log(f'{split}_mean_iou', sum([iou_sum[l] / iou_count[l] for l in LABELS]) / len(LABELS))
 
     def training_epoch_end(self, all_outputs):
         self.log_epoch_end(all_outputs, 'train')
