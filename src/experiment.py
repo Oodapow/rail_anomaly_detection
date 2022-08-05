@@ -12,6 +12,7 @@ class SegmentationExperiment(pl.LightningModule):
         decoder_weight,
         lr_factor,
         lr_patience,
+        loss_weights,
         decode_classes=['rail-embedded', 'rail-raised', 'rail-track', 'trackbed']
     ):
         super().__init__()
@@ -25,9 +26,8 @@ class SegmentationExperiment(pl.LightningModule):
         self.lr_patience = lr_patience
 
         self.model = UNet()
-        self.seg_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor(LABELS_WEIGHTS))
+        self.seg_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor(LABELS_WEIGHTS) if loss_weights else None)
         self.rec_loss = torch.nn.MSELoss()
-        self.softmax = torch.nn.Softmax(dim=1)
 
         self.decode_index = [i for i, l in enumerate(LABELS) if l in decode_classes]
 
@@ -54,12 +54,12 @@ class SegmentationExperiment(pl.LightningModule):
         rec_loss = self.rec_loss(e_iot, iot)
         loss = seg_loss + self.decoder_weight * rec_loss
 
-        e_ot = (self.softmax(e_ot) > 0.5).float()
+        e_tgt = torch.argmax(e_ot, dim=1)
 
         iou = {}
         for i,l in enumerate(LABELS):
-            inter = torch.count_nonzero(torch.logical_and(ot[:,i,:,:] == 1, e_ot[:,i,:,:] == 1), (1, 2))
-            union = torch.count_nonzero(torch.add(ot[:,i,:,:] , e_ot[:,i,:,:] ), (1, 2))
+            inter = torch.count_nonzero(torch.logical_and(tgt == i, e_tgt == i), (1, 2))
+            union = torch.count_nonzero(torch.logical_or(tgt == i, e_tgt == i), (1, 2))
             iou[l] = (inter / (union + 1)).detach().cpu()
 
         return {'loss': loss, 'seg_loss': seg_loss.detach().cpu(), 'rec_loss': rec_loss.detach().cpu(), 'iou': iou}

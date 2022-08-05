@@ -18,6 +18,8 @@ if __name__ == '__main__':
     parser.add_argument('--lr_factor', type=float, default=0.3)
     parser.add_argument('--lr_patience', type=int, default=20)
     parser.add_argument('--default_root_dir', type=str, default='/home/oodapow/experiments/')
+    parser.add_argument('--resume_from_checkpoint', type=str, default='')
+    parser.add_argument('--loss_weights', type=bool, default=0)
     args = parser.parse_args()
 
     logger = pl.loggers.wandb.WandbLogger(project='rail_anomaly_detection', name=args.name, version=args.version, log_model='all')
@@ -32,12 +34,14 @@ if __name__ == '__main__':
         args.decoder_weight,
         args.lr_factor,
         args.lr_patience,
+        args.loss_weights,
     )
 
     trainer = pl.Trainer(
         gpus=args.gpus,
         max_epochs=args.max_epochs,
         default_root_dir=args.default_root_dir,
+        resume_from_checkpoint=args.resume_from_checkpoint,
         progress_bar_refresh_rate=args.progress_bar_refresh_rate,
         logger=logger,
         callbacks=[
