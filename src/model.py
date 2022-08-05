@@ -5,7 +5,7 @@ MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 
 class ResNet(torch.nn.Module):
-    def __init__(self, num_classes=19):
+    def __init__(self, num_classes=20):
         super().__init__()
         self.transform = torchvision.transforms.Normalize(MEAN, STD)
 
@@ -22,9 +22,6 @@ class ResNet(torch.nn.Module):
         self.seg_head =  torch.nn.Conv2d(64, num_classes, kernel_size=1, bias=False)
         self.rec_head =  torch.nn.Conv2d(64, 3, kernel_size=1, bias=False)
 
-        self.sigmoid = torch.nn.Sigmoid()
-
-    
     def forward(self, x):
         x = self.transform(x)
 
@@ -33,14 +30,11 @@ class ResNet(torch.nn.Module):
         x_seg = self.seg_head(x)
         x_rec = self.rec_head(x)
 
-        x_seg = self.sigmoid(x_seg)
-        x_rec = self.sigmoid(x_rec)
-
         return x_seg, x_rec
 
 
 class UNet(torch.nn.Module):
-    def __init__(self, num_classes=19):
+    def __init__(self, num_classes=20):
         super().__init__()
         self.transform = torchvision.transforms.Normalize(MEAN, STD)
         self.block1 = torch.nn.Sequential(
@@ -69,8 +63,6 @@ class UNet(torch.nn.Module):
         self.seg_head =  torch.nn.Conv2d(32, num_classes, kernel_size=1, bias=False)
         self.rec_head =  torch.nn.Conv2d(32, 3, kernel_size=1, bias=False)
 
-        self.sigmoid = torch.nn.Sigmoid()
-
     def forward(self, x):
         x = self.transform(x)
 
@@ -85,9 +77,6 @@ class UNet(torch.nn.Module):
         
         x_seg = self.seg_head(x)
         x_rec = self.rec_head(x)
-
-        x_seg = self.sigmoid(x_seg)
-        x_rec = self.sigmoid(x_rec)
 
         return x_seg, x_rec
         

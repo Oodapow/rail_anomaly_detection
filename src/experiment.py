@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 import torch
 from model import ResNet, UNet
-from data import RailSemDataset, collate_fn, LABELS
+from data import RailSemDataset, collate_fn, LABELS, LABELS_WEIGHTS
 
 class SegmentationExperiment(pl.LightningModule):
     def __init__(self, 
@@ -25,8 +25,9 @@ class SegmentationExperiment(pl.LightningModule):
         self.lr_patience = lr_patience
 
         self.model = UNet()
-        self.seg_loss = torch.nn.BCELoss()
+        self.seg_loss = torch.nn.CrossEntropyLoss(weight=torch.tensor(LABELS_WEIGHTS))
         self.rec_loss = torch.nn.MSELoss()
+        self.softmax = torch.nn.Softmax(dim=1)
 
         self.decode_index = [i for i, l in enumerate(LABELS) if l in decode_classes]
 
@@ -35,7 +36,7 @@ class SegmentationExperiment(pl.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        it, ot, iot = batch
+        it, tgt, ot, iot = batch
         e_ot, e_iot = self(it)
 
         B, _, H, W = ot.shape
@@ -49,11 +50,11 @@ class SegmentationExperiment(pl.LightningModule):
 
         e_iot = e_iot * mask
 
-        seg_loss = self.seg_loss(e_ot, ot)
+        seg_loss = self.seg_loss(e_ot, tgt)
         rec_loss = self.rec_loss(e_iot, iot)
         loss = seg_loss + self.decoder_weight * rec_loss
 
-        e_ot = (e_ot > 0.5).float()
+        e_ot = (self.softmax(e_ot) > 0.5).float()
 
         iou = {}
         for i,l in enumerate(LABELS):

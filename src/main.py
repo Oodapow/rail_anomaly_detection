@@ -6,7 +6,7 @@ from experiment import SegmentationExperiment
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default='/home/oodapow/data/rs19')
-    parser.add_argument('--learning_rate', type=float, default=1.0)
+    parser.add_argument('--learning_rate', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=6)
     parser.add_argument('--gpus', type=int, default=1)

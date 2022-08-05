@@ -4,13 +4,18 @@ import numpy as np
 import cv2
 import json
 
-LABELS = ['road', 'sidewalk', 'construction', 'tram-track', 'fence', 'pole', 'traffic-light', 'traffic-sign', 'vegetation', 'terrain', 'sky', 'human', 'rail-track', 'car', 'truck', 'trackbed', 'on-rails', 'rail-raised', 'rail-embedded']
+LABELS =      ['road', 'sidewalk', 'construction', 'tram-track', 'fence', 'pole', 'traffic-light', 'traffic-sign', 'vegetation', 'terrain', 'sky', 'human', 'rail-track', 'car', 'truck', 'trackbed', 'on-rails', 'rail-raised', 'rail-embedded']
+
+LABELS_DIST = [0.052,   0.031,      0.122,          0.031,        0.025,   0.028,  0.003,           0.002,          0.233,        0.066,     0.223, 0.005,   0.059,        0.008, 0.007,   0.103,      0.033,      0.034,         0.015,         0.054]
+
+LABELS_WEIGHTS = [ 1 / l / len(LABELS_DIST) for l in LABELS_DIST ]
 
 def collate_fn(batch):
     images = torch.stack([b[0] for b in batch])
-    outputs = torch.stack([b[1] for b in batch])
-    output_images = torch.stack([b[2] for b in batch])
-    return images, outputs, output_images
+    targets = torch.stack([b[1] for b in batch])
+    outputs = torch.stack([b[2] for b in batch])
+    output_images = torch.stack([b[3] for b in batch])
+    return images, targets, outputs, output_images
 
 class RailSemDataset(torch.utils.data.Dataset):
     def __init__(self, path, ids, in_dim=(960, 540), out_dim=(960, 540)):
@@ -42,16 +47,19 @@ class RailSemDataset(torch.utils.data.Dataset):
         im_id_map = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
 
         outputs = []
-        for i, _ in enumerate(self.config['labels']):
+        for i, _ in enumerate(LABELS):
             img = ((im_id_map == i).astype(int) * 255)[:,:,np.newaxis]
             outputs.append(img)
         
         output_tensor = np.concatenate(outputs, axis=2)
 
+        target_tensor = torch.tensor(cv2.resize(im_id_map.astype('float32'), self.out_dim, interpolation=cv2.INTER_NEAREST), dtype=torch.long).permute(0, 1)
+
         res = (
             torch.tensor(cv2.resize(input_tensor.astype('float32'), self.in_dim)).permute(2, 0, 1).div(255.), 
+            torch.where(target_tensor == 255, len(LABELS), target_tensor),
             torch.ceil(torch.tensor(cv2.resize(output_tensor.astype('float32'), self.out_dim)).permute(2, 0, 1).div(255.)),
-            torch.tensor(cv2.resize(input_tensor.astype('float32'), self.out_dim)).permute(2, 0, 1).div(255.)
+            torch.tensor(cv2.resize(input_tensor.astype('float32'), self.out_dim)).permute(2, 0, 1).div(255.),
         )
 
         torch.save(res, cache_path)
@@ -64,16 +72,18 @@ if __name__ == '__main__':
 
     print('len:', len(ds))
 
-    it, ot, iot = ds[0]
+    it, tgt, ot, iot = ds[0]
 
 
     print('it shape:', it.shape)
+    print('tgt shape:', tgt.shape)
     print('ot shape:', ot.shape)
-    print('iotot shape:', iot.shape)
+    print('iot shape:', iot.shape)
 
-    it, ot, iot = collate_fn([(it, ot, iot)])
+    it, tgt, ot, iot = collate_fn([(it, tgt, ot, iot)])
 
     print('collate_fn it shape:', it.shape)
+    print('collate_fn tgt shape:', tgt.shape)
     print('collate_fn ot shape:', ot.shape)
     print('collate_fn iot shape:', iot.shape)
 
