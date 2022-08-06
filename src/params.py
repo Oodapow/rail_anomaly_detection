@@ -12,7 +12,7 @@ def make_parser():
     parser.add_argument('--version', type=str, default='')
     parser.add_argument('--decoder_weight', type=float, default=0.5)
     parser.add_argument('--lr_factor', type=float, default=1/3)
-    parser.add_argument('--lr_patience', type=int, default=20)
+    parser.add_argument('--lr_patience', type=int, default=5)
     parser.add_argument('--default_root_dir', type=str, default='/home/oodapow/experiments/')
     parser.add_argument('--ckpt_path', type=str, default='')
     parser.add_argument('--loss_weights', type=bool, default=0)

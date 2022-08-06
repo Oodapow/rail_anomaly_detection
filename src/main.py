@@ -30,6 +30,7 @@ if __name__ == '__main__':
 
     trainer = pl.Trainer(
         detect_anomaly=True,
+        gradient_clip_val=10,
         gpus=args.gpus,
         max_epochs=args.max_epochs,
         default_root_dir=args.default_root_dir,
