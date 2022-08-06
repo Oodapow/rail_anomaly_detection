@@ -1,0 +1,25 @@
+import argparse
+
+def make_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_path', type=str, default='/home/oodapow/data/rs19')
+    parser.add_argument('--learning_rate', type=float, default=0.1)
+    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--num_workers', type=int, default=6)
+    parser.add_argument('--gpus', type=int, default=1)
+    parser.add_argument('--max_epochs', type=int, default=1000)
+    parser.add_argument('--name', type=str, default='rail_anomaly_detection')
+    parser.add_argument('--version', type=str, default='')
+    parser.add_argument('--decoder_weight', type=float, default=0.5)
+    parser.add_argument('--lr_factor', type=float, default=1/3)
+    parser.add_argument('--lr_patience', type=int, default=20)
+    parser.add_argument('--default_root_dir', type=str, default='/home/oodapow/experiments/')
+    parser.add_argument('--ckpt_path', type=str, default='')
+    parser.add_argument('--loss_weights', type=bool, default=0)
+    parser.add_argument('--model', type=str, default='UNet')
+    parser.add_argument('--teacher_model', type=str, default='')
+    parser.add_argument('--teacher_loss_weight', type=float, default=1.0)
+    parser.add_argument('--teacher_loss_temperature', type=float, default=7)
+    parser.add_argument('--teacher_state_path', type=str, default='')
+    parser.add_argument('--model_state_path', type=str, default='')
+    return parser
