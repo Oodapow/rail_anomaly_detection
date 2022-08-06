@@ -70,6 +70,7 @@ class SegmentationExperiment(pl.LightningModule):
         mask = torch.clamp(mask, 0, 1)
 
         e_iot = e_iot * mask
+        iot   = iot   * mask
 
         seg_loss = self.seg_loss(e_ot, tgt)
         rec_loss = self.rec_loss(e_iot, iot)
