@@ -21,6 +21,7 @@ if __name__ == '__main__':
         args.lr_factor,
         args.lr_patience,
         args.loss_weights,
+        args.ae_classes_only,
         args.model,
         args.teacher_model,
         args.teacher_loss_weight,

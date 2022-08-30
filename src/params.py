@@ -16,10 +16,12 @@ def make_parser():
     parser.add_argument('--default_root_dir', type=str, default='/home/oodapow/experiments/')
     parser.add_argument('--ckpt_path', type=str, default='')
     parser.add_argument('--loss_weights', type=bool, default=0)
+    parser.add_argument('--ae_classes_only', type=bool, default=1)
     parser.add_argument('--model', type=str, default='UNet')
     parser.add_argument('--teacher_model', type=str, default='')
-    parser.add_argument('--teacher_loss_weight', type=float, default=1.0)
+    parser.add_argument('--teacher_loss_weight', type=float, default=0.05)
     parser.add_argument('--teacher_loss_temperature', type=float, default=7)
     parser.add_argument('--teacher_state_path', type=str, default='')
     parser.add_argument('--model_state_path', type=str, default='')
+    parser.add_argument('--model_export_path', type=str, default='')
     return parser

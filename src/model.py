@@ -35,6 +35,179 @@ class UNet(torch.nn.Module):
         self.rec_head =  torch.nn.Conv2d(32, 3, kernel_size=1, bias=False)
         self.sigmoid = torch.nn.Sigmoid()
 
+    def dark_forward(self, x):
+        x = self.transform(x)
+
+        x1 = self.block1(x)
+        
+        x = self.pool1(x1)
+        x2 = self.block2(x)
+        
+        x = self.unpool1(x2)
+        x = torch.cat([x, x1], axis=1)
+        x3 = self.upblock1(x)
+        
+        x_seg = self.seg_head(x3)
+        x_rec = self.rec_head(x3)
+
+        x_rec = self.sigmoid(x_rec)
+
+        return x_seg, x_rec, x1, x2, x3
+
+    def forward(self, x):
+        x = self.transform(x)
+
+        x1 = self.block1(x)
+        
+        x = self.pool1(x1)
+        x = self.block2(x)
+        
+        x = self.unpool1(x)
+        x = torch.cat([x, x1], axis=1)
+        x = self.upblock1(x)
+        
+        x_seg = self.seg_head(x)
+        x_rec = self.rec_head(x)
+
+        x_rec = self.sigmoid(x_rec)
+
+        return x_seg, x_rec
+
+
+class UNetWide(torch.nn.Module):
+    def __init__(self, num_classes=20):
+        super().__init__()
+        self.transform = torchvision.transforms.Normalize(MEAN, STD)
+        self.block1 = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 64, kernel_size=3, padding=1, stride=2, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=0.2),
+            torch.nn.Conv2d(64, 128, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=0.3),
+        )
+        self.pool1 = torch.nn.MaxPool2d(kernel_size=3, padding=1, stride=2)
+        
+        self.block2 = torch.nn.Sequential(
+            torch.nn.Conv2d(128, 256, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=0.3),
+            torch.nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=0.3),
+        )
+        self.unpool1 = torch.nn.Sequential(
+            torch.nn.Upsample(scale_factor=2),
+            torch.nn.Conv2d(256, 128, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=0.3),
+        )
+        
+        self.upblock1 = torch.nn.Sequential(
+            torch.nn.Conv2d(256, 128, kernel_size=3, padding=1, bias=False),
+            torch.nn.Upsample(scale_factor=2),
+            torch.nn.Dropout(p=0.2),
+            torch.nn.Conv2d(128, 64, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=0.2),
+        )
+
+        self.seg_head =  torch.nn.Conv2d(64, num_classes, kernel_size=1, bias=False)
+        self.rec_head =  torch.nn.Conv2d(64, 3, kernel_size=1, bias=False)
+        self.sigmoid = torch.nn.Sigmoid()
+
+    def dark_forward(self, x):
+        x = self.transform(x)
+
+        x1 = self.block1(x)
+        
+        x = self.pool1(x1)
+        x2 = self.block2(x)
+        
+        x = self.unpool1(x2)
+        x = torch.cat([x, x1], axis=1)
+        x3 = self.upblock1(x)
+        
+        x_seg = self.seg_head(x3)
+        x_rec = self.rec_head(x3)
+
+        x_rec = self.sigmoid(x_rec)
+
+        return x_seg, x_rec, x1, x2, x3
+
+    def forward(self, x):
+        x = self.transform(x)
+
+        x1 = self.block1(x)
+        
+        x = self.pool1(x1)
+        x = self.block2(x)
+        
+        x = self.unpool1(x)
+        x = torch.cat([x, x1], axis=1)
+        x = self.upblock1(x)
+        
+        x_seg = self.seg_head(x)
+        x_rec = self.rec_head(x)
+
+        x_rec = self.sigmoid(x_rec)
+
+        return x_seg, x_rec
+
+class UNetWideND(torch.nn.Module):
+    def __init__(self, num_classes=20):
+        super().__init__()
+        self.transform = torchvision.transforms.Normalize(MEAN, STD)
+        self.block1 = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 64, kernel_size=3, padding=1, stride=2, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(64, 128, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+        )
+        self.pool1 = torch.nn.MaxPool2d(kernel_size=3, padding=1, stride=2)
+        
+        self.block2 = torch.nn.Sequential(
+            torch.nn.Conv2d(128, 256, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+        )
+        self.unpool1 = torch.nn.Sequential(
+            torch.nn.Upsample(scale_factor=2),
+            torch.nn.Conv2d(256, 128, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+        )
+        
+        self.upblock1 = torch.nn.Sequential(
+            torch.nn.Conv2d(256, 128, kernel_size=3, padding=1, bias=False),
+            torch.nn.Upsample(scale_factor=2),
+            torch.nn.Conv2d(128, 64, kernel_size=3, padding=1, bias=False),
+            torch.nn.ReLU(),
+        )
+
+        self.seg_head =  torch.nn.Conv2d(64, num_classes, kernel_size=1, bias=False)
+        self.rec_head =  torch.nn.Conv2d(64, 3, kernel_size=1, bias=False)
+        self.sigmoid = torch.nn.Sigmoid()
+    
+    def dark_forward(self, x):
+        x = self.transform(x)
+
+        x1 = self.block1(x)
+        
+        x = self.pool1(x1)
+        x2 = self.block2(x)
+        
+        x = self.unpool1(x2)
+        x = torch.cat([x, x1], axis=1)
+        x3 = self.upblock1(x)
+        
+        x_seg = self.seg_head(x3)
+        x_rec = self.rec_head(x3)
+
+        x_rec = self.sigmoid(x_rec)
+
+        return x_seg, x_rec, x1, x2, x3
+
     def forward(self, x):
         x = self.transform(x)
 

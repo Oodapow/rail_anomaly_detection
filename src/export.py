@@ -26,7 +26,19 @@ if __name__ == '__main__':
         teacher_loss_weight=args.teacher_loss_weight,
         teacher_loss_temperature=args.teacher_loss_temperature,
         teacher_state_path=args.teacher_state_path,
-        ae_classes_only=args.ae_classes_only,
     )
 
-    torch.save(experiment.model.state_dict(), args.model_state_path)
+    in_t = torch.rand((1, 3, 540, 960))
+
+    out_s, out_r = experiment.model(in_t)
+
+    print(out_s.shape)
+    print(out_r.shape)
+
+    torch.onnx.export(
+        experiment.model,
+        in_t,
+        args.model_export_path,
+        opset_version=11,
+        do_constant_folding=False,
+    )
