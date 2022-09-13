@@ -3,6 +3,7 @@ import argparse
 def make_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default='/home/oodapow/data/rs19')
+    parser.add_argument('--fake_data_path', type=str, default='')
     parser.add_argument('--learning_rate', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=6)
@@ -16,7 +17,7 @@ def make_parser():
     parser.add_argument('--default_root_dir', type=str, default='/home/oodapow/experiments/')
     parser.add_argument('--ckpt_path', type=str, default='')
     parser.add_argument('--loss_weights', type=bool, default=0)
-    parser.add_argument('--ae_classes_only', type=bool, default=1)
+    parser.add_argument('--ae_classes_only', type=int, default=1)
     parser.add_argument('--model', type=str, default='UNet')
     parser.add_argument('--teacher_model', type=str, default='')
     parser.add_argument('--teacher_loss_weight', type=float, default=0.05)

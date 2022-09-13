@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 import torch
-from model import UNet, UNetTeacher, UNetWide, UNetWideND
-from data import RailSemDataset, collate_fn, LABELS, LABELS_WEIGHTS
+from model import UNet, UNetTeacher, UNetWide, UNetWideND, UNetV2, UNetFinetune
+from data import RailSemDataset, collate_fn, LABELS, LABELS_WEIGHTS, RealDataset, collate_fn2
 
 def replace_dropout(m):
     for attr_str in dir(m):
@@ -43,7 +43,7 @@ class SegmentationExperiment(pl.LightningModule):
         self.ae_classes_only = ae_classes_only
         self.decode_classes = decode_classes
 
-        if ae_classes_only:
+        if ae_classes_only == 1:
             self.model = eval(model)(num_classes=len(decode_classes) + 1)
         else:
             self.model = eval(model)()
@@ -242,4 +242,126 @@ class SegmentationExperiment(pl.LightningModule):
             batch_size=1, 
             num_workers=self.num_workers,
             collate_fn=collate_fn
+        )
+
+class RealSegmentationExperiment(pl.LightningModule):
+    def __init__(self, 
+        data_path,
+        fake_data_path, 
+        learning_rate, 
+        batch_size, 
+        num_workers, 
+        lr_factor,
+        lr_patience,
+        model,
+        model_state_path,
+    ):
+        super().__init__()
+
+        self.data_path = data_path
+        self.fake_data_path = fake_data_path
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.lr_factor = lr_factor
+        self.lr_patience = lr_patience
+
+        self.model = eval(model)()
+
+        if model_state_path:
+            self.model.load_state_dict(torch.load(model_state_path), strict=False)
+    
+        self.seg_loss = torch.nn.CrossEntropyLoss()
+
+    @torch.no_grad()
+    def teacher_forward(self, x):
+        return self.teacher_model.dark_forward(x)
+
+    def forward(self, x):
+        return self.model(x)
+
+    def training_step(self, batch, batch_idx):
+        it, tgt = batch
+        e_ot = self.model(it)
+        
+        loss = self.seg_loss(e_ot, tgt) 
+
+        e_tgt = torch.argmax(e_ot, dim=1)
+        inter = torch.count_nonzero(torch.logical_and(tgt == 1, e_tgt == 1), (1, 2))
+        union = torch.count_nonzero(torch.logical_or(tgt == 1, e_tgt == 1), (1, 2))
+        iou = (inter / (union + 1)).detach().cpu()
+
+        res = {'loss': loss, 'seg_loss': loss.detach().cpu(), 'iou': iou}
+
+        return res
+
+    def validation_step(self, batch, batch_idx):
+        return self.training_step(batch, batch_idx)
+
+    def log_epoch_end(self, all_outputs, split):
+        seg_loss_sum = 0
+
+        iou_sum = 0
+        iou_count = 0
+        for x in all_outputs:
+            seg_loss, iou,  = x['seg_loss'], x['iou']
+            seg_loss_sum += seg_loss
+            iou_sum += iou.sum()
+            iou_count += iou.numel()
+
+        num_outputs = len(all_outputs)
+
+        self.log(f'{split}_iou', iou_sum / iou_count)
+
+        self.log(f'mean/{split}/seg_loss', seg_loss_sum / num_outputs)
+
+    def training_epoch_end(self, all_outputs):
+        self.log_epoch_end(all_outputs, 'train')
+
+    def validation_epoch_end(self, all_outputs):
+        self.log_epoch_end(all_outputs, 'eval')
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate)
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer, 
+                    factor=self.lr_factor, 
+                    patience=self.lr_patience, 
+                    mode='max'
+                ),
+                'interval': 'epoch',
+                'frequency': 1,
+                'monitor': 'eval_iou',
+                'strict': True,
+                'name': 'learning_rate',
+            },
+        }
+
+    ####################
+    # DATA RELATED HOOKS
+    ####################
+
+    def train_dataloader(self):
+        dataset = RealDataset(self.data_path, range(100, 894))
+        if self.fake_data_path:
+            dataset = torch.utils.data.ConcatDataset(
+                [ dataset, RealDataset(self.fake_data_path, range(894, 1059)) ]
+            )
+        return torch.utils.data.DataLoader(
+            dataset, 
+            batch_size=self.batch_size, 
+            num_workers=self.num_workers,
+            collate_fn=collate_fn2
+        )
+
+    def val_dataloader(self):
+        dataset = RealDataset(self.data_path, range(0, 100))
+        return torch.utils.data.DataLoader(
+            dataset, 
+            batch_size=1, 
+            num_workers=self.num_workers,
+            collate_fn=collate_fn2
         )

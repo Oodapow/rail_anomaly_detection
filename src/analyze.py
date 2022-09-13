@@ -10,10 +10,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logger = pl.loggers.wandb.WandbLogger(project='rail_anomaly_detection', name=args.name, version=args.version, log_model='all')
+    print(args.ae_classes_only)
 
     experiment = SegmentationExperiment.load_from_checkpoint(
         args.ckpt_path,
+        strict=False,
         data_path=args.data_path,
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
@@ -30,7 +31,8 @@ if __name__ == '__main__':
         ae_classes_only=args.ae_classes_only,
     )
 
-    image = cv2.imread("/home/oodapow/code/rail_anomaly_detection/imagine4.jpg")
+    image = cv2.imread("/home/oodapow/code/rail_anomaly_detection/src/895.png")
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     in_t = torch.stack([torch.tensor(cv2.resize(image.astype('float32'), (960, 540))).permute(2, 0, 1).div(255.)])
 
@@ -38,6 +40,7 @@ if __name__ == '__main__':
 
     out_s, out_r = torch.argmax(out_s, dim=1)[0], out_r[0].permute(1, 2, 0).detach().cpu().numpy() * 255
 
+    #out_s = torch.where(torch.logical_or(out_s == 17, out_s == 12), 255, 0).detach().cpu().numpy()
     out_s = torch.where(out_s > 0, 255, 0).detach().cpu().numpy()
 
     cv2.imwrite("seg.png", out_s)

@@ -17,6 +17,11 @@ def collate_fn(batch):
     output_images = torch.stack([b[3] for b in batch])
     return images, targets, outputs, output_images
 
+def collate_fn2(batch):
+    images = torch.stack([b[0] for b in batch])
+    targets = torch.stack([b[1] for b in batch])
+    return images, targets
+
 class RailSemDataset(torch.utils.data.Dataset):
     def __init__(self, path, ids, in_dim=(960, 540), out_dim=(960, 540)):
         super().__init__()
@@ -65,39 +70,56 @@ class RailSemDataset(torch.utils.data.Dataset):
         torch.save(res, cache_path)
 
         return res
+
+class RealDataset(torch.utils.data.Dataset):
+    def __init__(self, path, ids, in_dim=(960, 540), out_dim=(960, 540)):
+        super().__init__()
+        self.path = path
+        self.ids = list(ids)
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+
+    def __len__(self):
+        return len(self.ids)
+    
+    def __getitem__(self, index):
+        id = self.ids[index]
+
+        cache_path = os.path.join(self.path, 'cache', f'{id}_{self.in_dim[0]}x{self.in_dim[1]}_{self.out_dim[0]}x{self.out_dim[1]}.pt')
+
+        if os.path.isfile(cache_path):
+            return torch.load(cache_path)
+        
+        input_path = os.path.join(self.path, 'frames', f'{id}.png')
+        output_path = os.path.join(self.path, 'ground_truths', f'{id}.png')
+
+        input_tensor = cv2.imread(input_path)
+        input_tensor = cv2.cvtColor(input_tensor, cv2.COLOR_BGR2RGB)
+        input_tensor = torch.tensor(cv2.resize(input_tensor.astype('float32'), self.in_dim)).permute(2, 0, 1).div(255.)
+        
+        output_tensor = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
+        output_tensor = torch.tensor(cv2.resize(np.ceil(output_tensor.astype('float32') / 255.), self.out_dim, interpolation=cv2.INTER_NEAREST), dtype=torch.long).permute(0, 1)
+        res = (input_tensor, output_tensor)
+
+        torch.save(res, cache_path)
+
+        return res
         
 if __name__ == '__main__':
 
-    ds = RailSemDataset('/home/oodapow/data/rs19', range(10))
+    ds = RealDataset('/home/oodapow/data/dji_rail_data/original_size', range(10))
 
     print('len:', len(ds))
 
-    it, tgt, ot, iot = ds[0]
+    it, tgt = ds[0]
 
 
     print('it shape:', it.shape)
     print('tgt shape:', tgt.shape)
-    print('ot shape:', ot.shape)
-    print('iot shape:', iot.shape)
 
-    it, tgt, ot, iot = collate_fn([(it, tgt, ot, iot)])
+    it, tgt = collate_fn2([(it, tgt)])
 
     print('collate_fn it shape:', it.shape)
     print('collate_fn tgt shape:', tgt.shape)
-    print('collate_fn ot shape:', ot.shape)
-    print('collate_fn iot shape:', iot.shape)
 
-    labels = []
-
-
-    # (2, 0, 1)
-    for i,l in enumerate(ds.config['labels']):
-        labels.append(l['name'])
-        cm = ot[:,i,:,:].unsqueeze(0)
-        im = iot * cm * 255.
-        im = im[0]
-        im = im.permute((1, 2, 0)).numpy()
-        print(im.shape)
-        cv2.imwrite(f'{l["name"]}.png', im)
-
-    print(labels)
+    print(torch.unique(tgt))
